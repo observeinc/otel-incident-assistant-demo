@@ -19,12 +19,14 @@ import AdProvider from '../../../providers/Ad.provider';
 import { useCart } from '../../../providers/Cart.provider';
 import * as S from '../../../styles/ProductDetail.styled';
 import { useCurrency } from '../../../providers/Currency.provider';
+import CustomAlert from '../../../components/CustomAlert'; // Import the custom alert component
 
 const quantityOptions = new Array(10).fill(0).map((_, i) => i + 1);
 
 const ProductDetail: NextPage = () => {
   const { push, query } = useRouter();
   const [quantity, setQuantity] = useState(1);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null); // State to manage the custom alert
   const {
     addItem,
     cart: { items },
@@ -53,11 +55,19 @@ const ProductDetail: NextPage = () => {
   ) as { data: Product };
 
   const onAddItem = useCallback(async () => {
-    await addItem({
-      productId,
-      quantity,
-    });
-    push('/cart');
+    try {
+      await addItem({
+        productId,
+        quantity,
+      });
+      push('/cart');
+    } catch (error) {
+      // Log the error to the console
+      console.error('Failed to add item to the cart:', error);
+
+      // Set the error message to trigger the custom alert
+      setErrorMessage('Failed to add item to the cart. Please try again.');
+    }
   }, [addItem, productId, quantity, push]);
 
   return (
@@ -97,6 +107,14 @@ const ProductDetail: NextPage = () => {
         <Ad />
         <Footer />
       </Layout>
+
+      {/* Render the custom alert if there's an error */}
+      {errorMessage && (
+        <CustomAlert
+          message={errorMessage}
+          onClose={() => setErrorMessage(null)}
+        />
+      )}
     </AdProvider>
   );
 };
