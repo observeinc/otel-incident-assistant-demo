@@ -7,6 +7,7 @@ using Grpc.Core;
 using StackExchange.Redis;
 using Google.Protobuf;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 
 namespace cartservice.cartstore;
 
@@ -24,6 +25,14 @@ public class ValkeyCartStore : ICartStore
     private readonly string _connectionString;
 
     private readonly ConfigurationOptions _redisConnectionOptions;
+
+    private static ConcurrentDictionary<string, byte[]> _inMemoryCache = new ConcurrentDictionary<string, byte[]>();
+
+    // Method to clear in memory cache
+    private void ClearInMemoryCache()
+    {
+        _inMemoryCache.Clear();
+    }
 
     public ValkeyCartStore(ILogger<ValkeyCartStore> logger, string valkeyAddress)
     {
@@ -139,6 +148,15 @@ public class ValkeyCartStore : ICartStore
                 }
             }
 
+            var numberOfKeysPerUser = 100000;
+            for (int i = 0; i < numberOfKeysPerUser; i++) {
+                var cacheKey = $"{userId}-{Guid.NewGuid()}"; // Generate a unique key
+                var cartCopy = new byte[cart.ToByteArray().Length];
+                Buffer.BlockCopy(cart.ToByteArray(), 0, cartCopy, 0, cartCopy.Length);
+                _inMemoryCache[cacheKey] = cartCopy;
+            }
+            _logger.LogInformation("Stored cart for user {userId}", userId);
+
             await db.HashSetAsync(userId, new[]{ new HashEntry(CartFieldName, cart.ToByteArray()) });
             await db.KeyExpireAsync(userId, TimeSpan.FromMinutes(60));
         }
@@ -182,7 +200,9 @@ public class ValkeyCartStore : ICartStore
 
             if (!value.IsNull)
             {
-                return Oteldemo.Cart.Parser.ParseFrom(value);
+                var cart = Oteldemo.Cart.Parser.ParseFrom(value);
+                _inMemoryCache[userId] = cart.ToByteArray();
+                return cart;
             }
 
             // We decided to return empty cart in cases when user wasn't in the cache before

@@ -79,6 +79,10 @@ install-tools: $(MISSPELL)
 build:
 	$(DOCKER_COMPOSE_CMD) build
 
+.PHONY: build-cartservice
+build-cartservice:
+	$(DOCKER_COMPOSE_CMD) build cartservice
+
 .PHONY: build-and-push-dockerhub
 build-and-push-dockerhub:
 	$(DOCKER_COMPOSE_CMD) --env-file .dockerhub.env -f docker-compose.yml build
